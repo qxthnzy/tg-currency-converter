@@ -3,7 +3,7 @@
 Запуск:
     pip install python-telegram-bot          # v20+
     export BOT_TOKEN=<токен от @BotFather>
-    export MINIAPP_URL=https://your-domain.com/index.html   # обязательно https
+    export MINIAPP_URL=...   # опционально, если URL приложения отличается от дефолтного
     python bot.py
 """
 
@@ -34,8 +34,8 @@ logging.getLogger("httpx").setLevel(logging.WARNING)   # иначе httpx зас
 log = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-# Подставьте сюда свой URL (или задайте переменную MINIAPP_URL).
-MINIAPP_URL = os.getenv("MINIAPP_URL", "https://your-domain.com/index.html")
+# URL захостенного Mini App (можно переопределить переменной MINIAPP_URL).
+MINIAPP_URL = os.getenv("MINIAPP_URL", "https://qxthnzy.github.io/tg-currency-converter/index.html")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")                 # опционально: продакшен вместо polling
 PORT = int(os.getenv("PORT", 8080))
 
@@ -101,9 +101,6 @@ def main() -> None:
     if not BOT_TOKEN:
         sys.exit("Ошибка: не задан BOT_TOKEN.\nПолучите токен у @BotFather и выполните:\n"
                  '  export BOT_TOKEN="123456:ABC-..."')
-    if MINIAPP_URL.startswith("https://your-domain.com"):
-        log.warning("MINIAPP_URL — заглушка. Кнопка не откроется, пока не подставите свой https-URL.")
-
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
