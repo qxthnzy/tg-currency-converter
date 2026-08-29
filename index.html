@@ -532,12 +532,19 @@ function shareResult() {
     amount: parseFloat(ui.fromAmt.value) || 0,
     result: parseFloat(ui.toAmt.value) || 0,
   };
-  // sendData работает только если app открыт с keyboard-кнопки (и закрывает app);
-  // иначе — обычный шеринг текста
-  if (tg && tg.sendData && tg.initData) { tg.sendData(JSON.stringify(payload)); return; }
-  if (tg && tg.switchInlineQuery) return tg.switchInlineQuery(text, ['users', 'groups']);
-  if (tg && tg.openTelegramLink) return tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(text));
-  navigator.clipboard && navigator.clipboard.writeText(text);
+  // sendData Telegram принимает ТОЛЬКО из app, открытого кнопкой клавиатуры.
+  // У таких запусков нет query_id — по нему и отличаем (у inline/меню/прямой ссылки он есть).
+  const fromKeyboard = tg && tg.initData && !(tg.initDataUnsafe || {}).query_id;
+  try {
+    if (fromKeyboard) { tg.sendData(JSON.stringify(payload)); return; }
+    // остальные запуски: системный диалог «Поделиться» с готовым текстом
+    if (tg && tg.openTelegramLink) { tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(text)); return; }
+  } catch (err) {
+    console.error('share failed', err);
+  }
+  // вне Telegram: копируем в буфер и сообщаем об этом, иначе кнопка выглядит сломанной
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => { ui.status.textContent = 'Результат скопирован в буфер обмена'; });
+  else ui.status.textContent = 'Поделиться можно только из Telegram';
 }
 
 /* --- события --- */
