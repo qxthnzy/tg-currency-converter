@@ -1,0 +1,2 @@
+python-telegram-bot>=22.8,<23    # Telegram Bot API (тянет httpx — отдельный requests не нужен)
+python-dotenv>=1.2.3,<2          # читает BOT_TOKEN и MINIAPP_URL из .env

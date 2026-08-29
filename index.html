@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Конвертер валют</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+:root {
+  --bg: #0a0e27;
+  --card: #1a1f3a;
+  --text: #ffffff;
+  --muted: #999999;
+  --accent: #0088cc;
+  --shadow: 0 2px 12px rgba(0, 0, 0, .35);
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f2f4f8;
+    --card: #ffffff;
+    --text: #000000;
+    --shadow: 0 2px 12px rgba(0, 0, 0, .08);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  max-width: 500px;
+  margin-inline: auto;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 24px;
+}
+
+h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 24px 0 8px;
+}
+
+/* --- converter grid --- */
+
+#converter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.side {
+  flex: 1 1 200px;
+  min-width: 0;
+  background: var(--card);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin: 0;
+}
+
+legend, label {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: .04em;
+}
+
+legend { padding: 0; float: left; width: 100%; }
+
+label { display: block; margin: 12px 0 4px; }
+
+select, input {
+  width: 100%;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  transition: box-shadow .2s, border-color .2s;
+}
+
+select { padding: 8px; }
+input { padding: 12px; }
+
+select:focus, input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 136, 204, .3);
+}
+
+output {
+  display: block;
+  margin-top: 12px;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+/* --- buttons --- */
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: opacity .2s, transform .2s;
+}
+
+button:hover { opacity: .8; }
+button:active { transform: scale(.95); }
+button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+#swap {
+  flex: 1 1 100%;
+  order: 1;               /* between the two cards on one column, full width on wide */
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.actions button { flex: 1; }
+
+#favorite[aria-pressed="true"] { background: #e0b400; }
+
+/* --- history --- */
+
+#history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#history li {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(128, 128, 128, .2);
+  animation: fade-in .3s ease-out;
+}
+
+#history-empty { font-size: 12px; color: var(--muted); }
+#history:not(:empty) + #history-empty { display: none; }
+
+/* --- animations --- */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes swipe {
+  50% { transform: translateX(12px); opacity: .4; }
+}
+
+.swapping .side { animation: swipe .3s ease-in-out; }
+.swapping .side:last-of-type { animation-direction: reverse; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* --- small screens --- */
+
+@media (max-width: 400px) {
+  body { padding: 12px; }
+  h1 { font-size: 20px; margin-bottom: 16px; }
+  .side { padding: 12px; }
+  output { font-size: 26px; }
+  button { padding: 10px 16px; }
+}
+
+/* --- тема от Telegram перекрывает системную --- */
+
+body.dark-theme {
+  --bg: #0a0e27;
+  --card: #1a1f3a;
+  --text: #ffffff;
+  --shadow: 0 2px 12px rgba(0, 0, 0, .35);
+}
+
+body.light-theme {
+  --bg: #f2f4f8;
+  --card: #ffffff;
+  --text: #000000;
+  --shadow: 0 2px 12px rgba(0, 0, 0, .08);
+}
+
+#greeting {
+  margin: -16px 0 24px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+#greeting:empty { display: none; }
+
+/* --- избранные пары --- */
+
+#favorites {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.pair {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+#favorites-empty { font-size: 12px; color: var(--muted); }
+#favorites:not(:empty) + #favorites-empty { display: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Конвертер валют</h1>
+    <p id="greeting"></p>
+  </header>
+
+  <main>
+
+    <form id="converter" autocomplete="off">
+      <fieldset class="side">
+        <legend>Из</legend>
+        <label for="from-currency">Валюта</label>
+        <select id="from-currency" name="from-currency">
+          <option value="USD" selected>USD — Доллар США</option>
+          <option value="EUR">EUR — Евро</option>
+          <option value="RUB">RUB — Российский рубль</option>
+          <option value="GBP">GBP — Фунт стерлингов</option>
+          <option value="JPY">JPY — Японская иена</option>
+          <option value="CNY">CNY — Китайский юань</option>
+          <option value="KRW">KRW — Южнокорейская вона</option>
+          <option value="INR">INR — Индийская рупия</option>
+          <option value="BRL">BRL — Бразильский реал</option>
+          <option value="MXN">MXN — Мексиканское песо</option>
+        </select>
+
+        <label for="from-amount">Сумма</label>
+        <input id="from-amount" name="from-amount" type="number" inputmode="decimal"
+               min="0" step="any" value="1" placeholder="0">
+
+        <output id="from-result" for="from-amount from-currency"></output>
+      </fieldset>
+
+      <button type="button" id="swap" aria-label="Поменять валюты местами">⇅ Поменять местами</button>
+
+      <fieldset class="side">
+        <legend>В</legend>
+        <label for="to-currency">Валюта</label>
+        <select id="to-currency" name="to-currency">
+          <option value="USD">USD — Доллар США</option>
+          <option value="EUR">EUR — Евро</option>
+          <option value="RUB" selected>RUB — Российский рубль</option>
+          <option value="GBP">GBP — Фунт стерлингов</option>
+          <option value="JPY">JPY — Японская иена</option>
+          <option value="CNY">CNY — Китайский юань</option>
+          <option value="KRW">KRW — Южнокорейская вона</option>
+          <option value="INR">INR — Индийская рупия</option>
+          <option value="BRL">BRL — Бразильский реал</option>
+          <option value="MXN">MXN — Мексиканское песо</option>
+        </select>
+
+        <label for="to-amount">Сумма</label>
+        <input id="to-amount" name="to-amount" type="number" inputmode="decimal"
+               min="0" step="any" placeholder="0">
+
+        <output id="to-result" for="from-amount from-currency to-currency"></output>
+      </fieldset>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <nav class="actions">
+      <button type="button" id="favorite" aria-pressed="false">☆ Избранное</button>
+      <button type="button" id="share">Поделиться результатом</button>
+    </nav>
+
+    <section id="favorites-section">
+      <h2>Избранные пары</h2>
+      <ul id="favorites"></ul>
+      <p id="favorites-empty">Пока пусто.</p>
+    </section>
+
+    <section id="history-section">
+      <h2>История</h2>
+      <ol id="history" reversed></ol>
+      <p id="history-empty">Пока пусто.</p>
+    </section>
+
+  </main>
+
+  <script>
+'use strict';
+
+const API = 'https://api.exchangerate-api.com/v4/latest/USD';
+const KEY = 'conv';
+const TTL = 60 * 60 * 1000;      // 1 час
+const MAX_FAVORITES = 5;
+const MAX_HISTORY = 100;
+const SHOWN_HISTORY = 5;
+
+// имя бота для deep-link в шеринге
+const BOT = 'your_bot';
+
+// без guard'а страница падает при локальном открытии вне Telegram
+const tg = window.Telegram && window.Telegram.WebApp;
+
+const el = id => document.getElementById(id);
+const ui = {
+  form: el('converter'),
+  fromCur: el('from-currency'), fromAmt: el('from-amount'), fromOut: el('from-result'),
+  toCur: el('to-currency'), toAmt: el('to-amount'), toOut: el('to-result'),
+  swap: el('swap'), favorite: el('favorite'), share: el('share'),
+  status: el('status'), history: el('history'), greeting: el('greeting'), favorites: el('favorites'),
+};
+
+/* --- хранилище --- */
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || {}; }
+  catch { return {}; }
+}
+
+function save(patch) {
+  const data = Object.assign(load(), patch);
+  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch { /* квота/приватный режим */ }
+  return data;
+}
+
+/* --- курсы --- */
+
+async function updateRate() {
+  const { rates, ratesUpdatedAt } = load();
+  if (rates && Date.now() - ratesUpdatedAt < TTL) return showRateInfo(ratesUpdatedAt, false);
+
+  setLoading(true);
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error(res.status);
+    const json = await res.json();
+    if (!json.rates) throw new Error('bad payload');
+    save({ rates: json.rates, ratesUpdatedAt: Date.now() });
+    showRateInfo(Date.now(), false);
+  } catch {
+    if (rates) showRateInfo(ratesUpdatedAt, true);
+    else ui.status.textContent = 'Не удалось загрузить курсы. Проверьте соединение.';
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on) {
+  if (on) ui.status.textContent = 'Загрузка курсов…';
+  for (const b of [ui.swap, ui.favorite, ui.share]) b.disabled = on;
+}
+
+function showRateInfo(at, offline) {
+  const when = new Date(at).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+  ui.status.textContent = offline
+    ? `Используются старые курсы (оффлайн), обновлены ${when}`
+    : `Курсы обновлены ${when}`;
+}
+
+/* --- конвертация --- */
+
+function convertCurrency(amount, fromCurrency, toCurrency) {
+  const { rates } = load();
+  if (!rates || !rates[fromCurrency] || !rates[toCurrency]) return null;
+  return amount / rates[fromCurrency] * rates[toCurrency];
+}
+
+const format = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// direction: 'from' — считаем правую колонку, 'to' — левую
+function render(direction = 'from') {
+  const from = ui.fromCur.value, to = ui.toCur.value;
+  const src = direction === 'from' ? ui.fromAmt : ui.toAmt;
+  const amount = parseFloat(src.value);
+
+  if (!isFinite(amount) || amount < 0) return;   // не число — игнорируем
+
+  const result = direction === 'from'
+    ? convertCurrency(amount, from, to)
+    : convertCurrency(amount, to, from);
+  if (result === null) return;
+
+  const dst = direction === 'from' ? ui.toAmt : ui.fromAmt;
+  dst.value = result.toFixed(2);
+
+  ui.fromOut.textContent = `${format(parseFloat(ui.fromAmt.value) || 0)} ${from}`;
+  ui.toOut.textContent = `${format(parseFloat(ui.toAmt.value) || 0)} ${to}`;
+  syncFavoriteButton();
+}
+
+function swapCurrencies() {
+  [ui.fromCur.value, ui.toCur.value] = [ui.toCur.value, ui.fromCur.value];
+  [ui.fromAmt.value, ui.toAmt.value] = [ui.toAmt.value, ui.fromAmt.value];
+  ui.form.classList.add('swapping');
+  setTimeout(() => ui.form.classList.remove('swapping'), 300);
+  render();
+}
+
+/* --- избранное --- */
+
+function loadFavorites() {
+  return load().favorites || [];
+}
+
+function saveFavorite(pair) {
+  const rest = loadFavorites().filter(f => f.from !== pair.from || f.to !== pair.to);
+  save({ favorites: [pair, ...rest].slice(0, MAX_FAVORITES) });
+}
+
+function renderFavorites() {
+  ui.favorites.replaceChildren(...loadFavorites().map(f => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pair';
+    btn.textContent = `${f.from} → ${f.to}`;
+    btn.addEventListener('click', () => {          // клик по паре — подставить её в конвертер
+      ui.fromCur.value = f.from;
+      ui.toCur.value = f.to;
+      render('from');
+    });
+    li.append(btn);
+    return li;
+  }));
+}
+
+function isFavorite(from, to) {
+  return loadFavorites().some(f => f.from === from && f.to === to);
+}
+
+function syncFavoriteButton() {
+  const on = isFavorite(ui.fromCur.value, ui.toCur.value);
+  ui.favorite.setAttribute('aria-pressed', String(on));
+  ui.favorite.textContent = on ? '★ В избранном' : '☆ Избранное';
+}
+
+/* --- история --- */
+
+function addToHistory(from, to, amount, result) {
+  const entry = { from, to, amount, result, date: Date.now() };
+  save({ history: [entry, ...(load().history || [])].slice(0, MAX_HISTORY) });
+  loadHistory();
+}
+
+function loadHistory() {
+  const items = (load().history || []).slice(0, SHOWN_HISTORY);
+  ui.history.replaceChildren(...items.map(h => {
+    const li = document.createElement('li');
+    const when = new Date(h.date).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+    li.textContent = `${format(h.amount)} ${h.from} → ${format(h.result)} ${h.to} · ${when}`;
+    return li;
+  }));
+}
+
+/* --- Telegram --- */
+
+function applyTheme() {
+  if (!tg) return;
+  document.body.classList.toggle('dark-theme', tg.colorScheme === 'dark');
+  document.body.classList.toggle('light-theme', tg.colorScheme === 'light');
+}
+
+function greetUser() {
+  const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (user && user.first_name) ui.greeting.textContent = `Привет, ${user.first_name}!`;
+}
+
+// возврат в app по ссылке ?startapp=USD-EUR-100
+function applyStartParam() {
+  const raw = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+  if (!raw) return;
+  const [from, to, amount] = String(raw).split('-');
+  const known = c => [...ui.fromCur.options].some(o => o.value === c);   // валидация: только валюты из списка
+  if (!known(from) || !known(to)) return;
+  ui.fromCur.value = from;
+  ui.toCur.value = to;
+  if (isFinite(parseFloat(amount)) && parseFloat(amount) >= 0) ui.fromAmt.value = parseFloat(amount);
+}
+
+/* --- шеринг --- */
+
+function shareText() {
+  const from = ui.fromCur.value, to = ui.toCur.value;
+  const amount = parseFloat(ui.fromAmt.value) || 0;
+  const result = parseFloat(ui.toAmt.value) || 0;
+  const rate = convertCurrency(1, from, to);
+  const when = new Date().toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
+  return [
+    `🔄 Я конвертировал ${format(amount)} ${from} в ${to} и получил ${format(result)} ${to}`,
+    rate === null ? '' : `💱 Курс: 1 ${from} = ${rate.toFixed(4)} ${to}`,
+    `📅 Время: ${when}`,
+    `Попробуй сам: https://t.me/${BOT}?startapp=${from}-${to}-${amount}`,
+  ].filter(Boolean).join('\n');
+}
+
+function shareResult() {
+  const text = shareText();
+  const payload = {
+    from: ui.fromCur.value,
+    to: ui.toCur.value,
+    amount: parseFloat(ui.fromAmt.value) || 0,
+    result: parseFloat(ui.toAmt.value) || 0,
+  };
+  // sendData работает только если app открыт с keyboard-кнопки (и закрывает app);
+  // иначе — обычный шеринг текста
+  if (tg && tg.sendData && tg.initData) { tg.sendData(JSON.stringify(payload)); return; }
+  if (tg && tg.switchInlineQuery) return tg.switchInlineQuery(text, ['users', 'groups']);
+  if (tg && tg.openTelegramLink) return tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(text));
+  navigator.clipboard && navigator.clipboard.writeText(text);
+}
+
+/* --- события --- */
+
+ui.fromAmt.addEventListener('input', () => render('from'));
+ui.toAmt.addEventListener('input', () => render('to'));
+ui.fromCur.addEventListener('change', () => render('from'));
+ui.toCur.addEventListener('change', () => render('from'));
+ui.swap.addEventListener('click', swapCurrencies);
+
+// в историю пишем по завершении ввода, а не на каждое нажатие
+for (const input of [ui.fromAmt, ui.toAmt]) {
+  input.addEventListener('change', () => {
+    const amount = parseFloat(ui.fromAmt.value), result = parseFloat(ui.toAmt.value);
+    if (isFinite(amount) && isFinite(result)) addToHistory(ui.fromCur.value, ui.toCur.value, amount, result);
+  });
+}
+
+ui.favorite.addEventListener('click', () => {
+  saveFavorite({ from: ui.fromCur.value, to: ui.toCur.value });
+  syncFavoriteButton();
+  renderFavorites();
+});
+
+ui.share.addEventListener('click', shareResult);
+
+/* --- старт --- */
+
+if (tg) {
+  tg.ready();          // сигнал Telegram: app готов
+  tg.expand();
+  applyTheme();
+  tg.onEvent('themeChanged', applyTheme);
+  greetUser();
+  applyStartParam();
+}
+loadHistory();
+renderFavorites();
+syncFavoriteButton();
+updateRate().then(() => render());
+
+/* --- самопроверка: открыть index.html#test --- */
+
+if (location.hash === '#test') {
+  save({ rates: { USD: 1, EUR: 0.5, RUB: 100 } });
+  console.assert(convertCurrency(10, 'USD', 'EUR') === 5, 'USD→EUR');
+  console.assert(convertCurrency(10, 'EUR', 'RUB') === 2000, 'кросс-курс');
+  console.assert(convertCurrency(1, 'USD', 'XXX') === null, 'неизвестная валюта');
+  console.assert(format(1000000) === '1,000,000.00', 'формат');
+  console.log('selftest done');
+}
+  </script>
+</body>
+</html>
